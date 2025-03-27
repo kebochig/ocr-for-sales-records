@@ -26,8 +26,14 @@ def extract_text_from_image(image_path):
 
     prompt = '''
             Extract the text in the sales record image as a sales record csv including the date and the business name which is the title of the image.
-            Final table format - business_name,product,quantity,unit_price,date(yyyy-mm-dd)
+            Remove any commas from numbers or texts if spotted. Date format should be yyyy-mm-dd
+            Final table format - business_name,product,quantity,unit_price,date
         '''
+
+    # prompt = '''
+    #         Extract the text in the sales record image as a sales record file including the date and the business name which is the title of the image.
+    #         Final table format - business_name\tproduct\tquantity\tunit_price\tdate(yyyy-mm-dd)
+    #     '''
     
     # Prompt the model with text and the previously uploaded image.
     response = model.generate_content([image_path, prompt])
@@ -47,8 +53,8 @@ def final_action(images):
         # for i in range(0, len(images), 3):
             extracted_texts.append(extract_text_from_image(img)[6:][:-4])
             # extracted_texts.append('Times...')
-            print(f'>>>> Page: {images.index(img)+1} done')
-            # print(extracted_texts)
+            print(f'>>>> Page: {images.index(img)+1} done \n')
+            print(extracted_texts)
             # time.sleep(2)  # Wait 2 seconds before the next request
 
     full_text = "\n\n".join(extracted_texts)
@@ -66,7 +72,39 @@ def final_action(images):
         st.success(f"✅ Extraction Completed in {elapsed_time:.2f} seconds")
 
     except:
-        st.error("Error: Failed to parse structured data. Check the extracted text.")
+        # st.error("Error: Failed to parse structured data. Check the extracted text.")
+        st.subheader("📜 Extracted Sales Data")
+        st.text_area("OCR Output", full_text, height=300)
+
+def final_action2(images):
+    # Perform OCR on each extracted image
+    extracted_texts_df = []
+    start_time = time.time()
+    with st.spinner("Extracting text..."):
+        for img in images:
+            try:
+                extract = extract_text_from_image(img)[6:][:-4]
+                df = pd.read_csv(StringIO(extract), delimiter=None, engine='python')
+                extracted_texts_df.append(df)
+                print(f'>>>> Page: {images.index(img)+1} done \n')
+                print(df.head(3))
+            except:
+                print(f'>>>> Page: {images.index(img)+1} Not Parsable \n {extract}')
+                st.warning(f"Warn: Failed to parse structured data in page {images.index(img)+1}")
+                st.subheader("📜 Extracted Sales Data")
+                st.text_area("Unparsed OCR Output", extract, height=300)
+                continue
+
+    full_df = pd.concat(extracted_texts_df, ignore_index=True)
+    # df = df[df['business_name'] != 'business_name']
+
+    # Display DataFrame
+    st.subheader("📊 Extracted Sales Data")
+    st.dataframe(full_df)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    st.success(f"✅ Extraction Completed in {elapsed_time:.2f} seconds")
 
 
 # # Streamlit UI
@@ -88,7 +126,7 @@ if uploaded_file:
         for img in images:
                 st.image(img, caption="Extracted Page", use_container_width=True)
 
-        final_action(images)
+        final_action2(images)
 
     # Process PDF Files (Extract images from scanned PDFs)
     elif file_type == "application/pdf":
@@ -117,4 +155,4 @@ if uploaded_file:
             for img in images:
                 st.image(img, caption="Extracted Page", use_container_width=True)
 
-            final_action(images)
+            final_action2(images)
